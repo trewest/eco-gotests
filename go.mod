@@ -21,11 +21,8 @@ require (
 	github.com/openshift-kni/eco-goinfra v0.0.0-20240626143745-4d019aeb6f02 // release-4.15
 	github.com/openshift-kni/k8sreporter v1.0.5
 	github.com/openshift/api v3.9.1-0.20191111211345-a27ff30ebf09+incompatible
-	github.com/openshift/assisted-service/api v0.0.0
-	github.com/openshift/assisted-service/models v0.0.0
 	github.com/openshift/cluster-nfd-operator v0.0.0-20240604082319-19bf50784aa7
 	github.com/openshift/cluster-node-tuning-operator v0.0.0-20240606084543-6d2e11aec345
-	github.com/openshift/hive/apis v0.0.0-20220707210052-4804c09ccc5a
 	github.com/openshift/machine-config-operator v0.0.1-0.20230811181556-63d7be1ef18b
 	github.com/operator-framework/api v0.23.0
 	github.com/rh-ecosystem-edge/kernel-module-management v0.0.0-20240605101434-e1de2798b3c4
@@ -66,6 +63,7 @@ require (
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/golang-collections/collections v0.0.0-20130729185459-604e922904d3 // indirect
 	github.com/gorilla/websocket v1.5.1 // indirect
+	github.com/grafana/loki/operator/apis/loki v0.0.0-20240627192641-91a34868db61 // indirect
 	github.com/kdomanski/iso9660 v0.2.1 // indirect
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/metal3-io/baremetal-operator/pkg/hardwareutils v0.5.1 // indirect
@@ -190,7 +188,6 @@ require (
 	github.com/noobaa/noobaa-operator/v5 v5.0.0-20231213124549-5d7b0417716d // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/openshift-kni/cluster-group-upgrades-operator v0.0.0-20240423171335-f07cdbf8af2c
-	github.com/openshift/assisted-service v1.0.10-0.20230830164851-6573b5d7021d // indirect
 	github.com/openshift/custom-resource-status v1.1.3-0.20220503160415-f2fdb4999d87 // indirect
 	github.com/openshift/library-go v0.0.0-20240419113445-f1541d628746 // indirect
 	github.com/openshift/local-storage-operator v0.0.0-20240422172451-2a80d7f6681d // indirect
@@ -270,6 +267,7 @@ replace (
 	github.com/k8snetworkplumbingwg/sriov-network-operator => github.com/openshift/sriov-network-operator v0.0.0-20240508132640-2b61056c9758 // release-4.16
 	github.com/kubernetes-incubator/external-storage => github.com/libopenstorage/external-storage v1.8.1-0.20211117215743-47ffded9c408
 	github.com/metal3-io/baremetal-operator/pkg/hardwareutils => github.com/metal3-io/baremetal-operator/pkg/hardwareutils v0.6.1
+	github.com/openshift-kni/eco-goinfra => github.com/trewest/eco-goinfra v0.0.0-20240718172814-b778867af16c
 	github.com/openshift/api => github.com/openshift/api v0.0.0-20240605153344-636e2c17106f // release-4.16
 	github.com/openshift/assisted-service/api => github.com/openshift/assisted-service/api v0.0.0-20240529165317-6b26a25e2ae7 // release-4.16
 	github.com/openshift/assisted-service/models => github.com/openshift/assisted-service/models v0.0.0-20240529165317-6b26a25e2ae7 // release-4.16
