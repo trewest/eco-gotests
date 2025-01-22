@@ -347,11 +347,6 @@ func createIBIOResouces(addressFamily string) {
 		imageClusterInstall.WithSSHKey(MGMTConfig.PublicSSHKey)
 	}
 
-	if MGMTConfig.SeedClusterInfo.MirrorRegistryConfigured {
-		imageClusterInstall.Definition.Spec.ImageDigestSources =
-			MGMTConfig.SeedClusterInfo.MirrorConfig.Spec.ImageDigestMirrors
-	}
-
 	imageClusterInstall.Definition.Spec.BareMetalHostRef = &ibiv1alpha1.BareMetalHostReference{
 		Name:      snoNodeName,
 		Namespace: MGMTConfig.Cluster.Info.ClusterName,
