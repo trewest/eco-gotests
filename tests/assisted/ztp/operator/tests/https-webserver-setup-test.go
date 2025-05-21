@@ -19,6 +19,7 @@ import (
 	"github.com/openshift-kni/eco-gotests/tests/assisted/ztp/internal/meets"
 	. "github.com/openshift-kni/eco-gotests/tests/assisted/ztp/internal/ztpinittools"
 	"github.com/openshift-kni/eco-gotests/tests/assisted/ztp/operator/internal/tsparams"
+	"github.com/openshift-kni/eco-gotests/tests/internal/cluster"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -27,7 +28,7 @@ const (
 	serverName          = "https-webserver"
 	nsname              = "httpdtest"
 	containerPort       = 8443
-	httpdContainerImage = "registry.redhat.io/rhel8/httpd-24"
+	httpdContainerImage = "registry.redhat.io/rhel8/httpd-24@sha256:e79826192005406f8a4cedcaabc544cd3fb71a9ffd30d35da0ce7f2d149b974b"
 	httpsPVCQuantity    = "20Gi"
 )
 
@@ -107,6 +108,34 @@ var _ = Describe(
 						},
 					},
 				})
+
+				if proxyConfigured, _ := meets.HubProxyConfiguredRequirement(); proxyConfigured {
+					hubProxy, err := cluster.GetOCPProxy(HubAPIClient)
+					if err != nil {
+						Skip(fmt.Sprintf("Error pulling hub proxy configuration: %s", err))
+					}
+
+					var proxyEnvironment []corev1.EnvVar
+
+					if hubProxy.Object.Spec.HTTPProxy != "" {
+						proxyEnvironment = append(proxyEnvironment, corev1.EnvVar{Name: "HTTP_PROXY",
+							Value: hubProxy.Object.Spec.HTTPProxy})
+					}
+
+					if hubProxy.Object.Spec.HTTPSProxy != "" {
+						proxyEnvironment = append(proxyEnvironment, corev1.EnvVar{Name: "HTTPS_PROXY",
+							Value: hubProxy.Object.Spec.HTTPSProxy})
+					}
+
+					if hubProxy.Object.Spec.NoProxy != "" {
+						proxyEnvironment = append(proxyEnvironment, corev1.EnvVar{Name: "NO_PROXY",
+							Value: hubProxy.Object.Spec.NoProxy})
+					}
+
+					for containerIdx := range httpPodBuilder.Definition.Spec.Containers {
+						httpPodBuilder.Definition.Spec.Containers[containerIdx].Env = proxyEnvironment
+					}
+				}
 
 				By("Creating the pod on the cluster")
 				httpPodBuilder, err = httpPodBuilder.CreateAndWaitUntilRunning(time.Second * 180)
