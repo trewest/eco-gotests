@@ -204,6 +204,25 @@ var _ = Describe(
 				reinstallWithClusterInstance(ipv4AddrFamily)
 			})
 
+		It("through siteconfig operator is successful in an IPv4 environment with static networking",
+			reportxml.ID("83062"), func() {
+				if !MGMTConfig.StaticNetworking {
+					Skip("Cluster is deployed without static networking")
+				}
+
+				if !MGMTConfig.SiteConfig {
+					Skip("Cluster is deployed without siteconfig operator")
+				}
+
+				if MGMTConfig.SeedClusterInfo.Proxy.HTTPProxy != "" || MGMTConfig.SeedClusterInfo.Proxy.HTTPSProxy != "" {
+					Skip("Cluster installed with proxy")
+				}
+
+				tsparams.ReporterNamespacesToDump[MGMTConfig.Cluster.Info.ClusterName] = reporterNamespaceToDump
+
+				reinstallWithClusterInstance(ipv4AddrFamily)
+			})
+
 		It("through siteconfig operator is successful in an IPv6 proxy-enabled environment with DHCP networking",
 			reportxml.ID("83061"), func() {
 				if MGMTConfig.StaticNetworking {
@@ -291,6 +310,16 @@ func reinstallWithClusterInstance(addressFamily string) {
 			}
 
 			clusterInstace.Definition.Spec.Nodes[idx].BootMACAddress = host.BMC.MACAddress
+
+			if MGMTConfig.StaticNetworking {
+				for _, info := range MGMTConfig.Cluster.Info.Hosts {
+					nodeInetIdx := 0
+					for _, iface := range info.Network.Interfaces {
+						clusterInstace.Definition.Spec.Nodes[idx].NodeNetwork.Interfaces[nodeInetIdx].MacAddress = iface.MACAddress
+						nodeInetIdx++
+					}
+				}
+			}
 		}
 	}
 

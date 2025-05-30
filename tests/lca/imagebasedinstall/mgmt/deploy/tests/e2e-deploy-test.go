@@ -92,6 +92,25 @@ var _ = Describe(
 				createSiteConfigResouces(ipv4AddrFamily)
 			})
 
+		It("through siteconfig operator is successful in an IPv4 environment with static networking",
+			reportxml.ID("no-testcase"), func() {
+				if !MGMTConfig.StaticNetworking {
+					Skip("Cluster is deployed without static networking")
+				}
+
+				if !MGMTConfig.SiteConfig {
+					Skip("Cluster is deployed without siteconfig operator")
+				}
+
+				if MGMTConfig.SeedClusterInfo.Proxy.HTTPProxy != "" || MGMTConfig.SeedClusterInfo.Proxy.HTTPSProxy != "" {
+					Skip("Cluster installed with proxy")
+				}
+
+				tsparams.ReporterNamespacesToDump[MGMTConfig.Cluster.Info.ClusterName] = reporterNamespaceToDump
+
+				createSiteConfigResouces(ipv4AddrFamily)
+			})
+
 		It("successfully creates extramanifests", reportxml.ID("76643"), func() {
 			if !MGMTConfig.ExtraManifests {
 				Skip("Cluster not configured with extra manifests")
