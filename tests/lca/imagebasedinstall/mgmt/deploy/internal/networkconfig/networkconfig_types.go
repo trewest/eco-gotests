@@ -13,8 +13,8 @@ type Interface struct {
 	Name       string   `yaml:"name"`
 	Type       string   `yaml:"type"`
 	State      string   `yaml:"state"`
-	Identifier string   `yaml:"identifier"`
-	MACAddress string   `yaml:"mac-address"`
+	Identifier string   `yaml:"identifier,omitempty"`
+	MACAddress string   `yaml:"mac-address,omitempty"`
 	IPv4       IPConfig `yaml:"ipv4"`
 	IPv6       IPConfig `yaml:"ipv6"`
 }

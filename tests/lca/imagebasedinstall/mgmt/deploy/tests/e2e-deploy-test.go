@@ -54,6 +54,21 @@ var _ = Describe(
 				createIBIOResouces(ipv4AddrFamily)
 			})
 
+		It("through siteconfig operator operator is successful in a connected environment with static networking",
+			reportxml.ID("no-testcase"), func() {
+				if !MGMTConfig.StaticNetworking {
+					Skip("Cluster is deployed without static networking")
+				}
+
+				if !MGMTConfig.SiteConfig {
+					Skip("Cluster is deployed without siteconfig operator")
+				}
+
+				tsparams.ReporterNamespacesToDump[MGMTConfig.Cluster.Info.ClusterName] = reporterNamespaceToDump
+
+				createSiteConfigResouces(ipv4AddrFamily)
+			})
+
 		It("through siteconfig operator is successful in an IPv6 proxy-enabled environment with DHCP networking",
 			reportxml.ID("76642"), func() {
 				if MGMTConfig.StaticNetworking {
