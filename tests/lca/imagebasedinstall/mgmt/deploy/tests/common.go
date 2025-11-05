@@ -7,13 +7,17 @@ import (
 	"strconv"
 	"time"
 
+	configv1 "github.com/openshift/api/config/v1"
 	"github.com/rh-ecosystem-edge/eco-goinfra/pkg/bmh"
 	"github.com/rh-ecosystem-edge/eco-goinfra/pkg/clients"
 	"github.com/rh-ecosystem-edge/eco-goinfra/pkg/configmap"
+
 	"github.com/rh-ecosystem-edge/eco-goinfra/pkg/hive"
 	"github.com/rh-ecosystem-edge/eco-goinfra/pkg/ibi"
+	"github.com/rh-ecosystem-edge/eco-goinfra/pkg/idms"
 	"github.com/rh-ecosystem-edge/eco-goinfra/pkg/namespace"
 	"github.com/rh-ecosystem-edge/eco-goinfra/pkg/ocm"
+
 	"github.com/rh-ecosystem-edge/eco-goinfra/pkg/schemes/assisted/api/v1beta1"
 	hivev1 "github.com/rh-ecosystem-edge/eco-goinfra/pkg/schemes/hive/api/v1"
 	"github.com/rh-ecosystem-edge/eco-goinfra/pkg/schemes/hive/api/v1/none"
@@ -43,6 +47,8 @@ const (
 
 	extraManifestNamespaceConfigmapName = "extra-manifests-cm0"
 	extraManifestConfigmapConfigmapName = "extra-manifests-cm1"
+
+	idmsConfigmapName = "idms-configmap"
 
 	caBundleConfigMapName = "ca-bundle-configmap"
 
@@ -302,7 +308,7 @@ func createIBIOResouces(addressFamily string) {
 		BeTrue(), "error waiting for imageclusterinstall to complete")
 }
 
-//nolint:funlen
+//nolint:funlen,gocognit
 func createSiteConfigResouces(addressFamily string) {
 	createSharedResources()
 
@@ -358,6 +364,30 @@ func createSiteConfigResouces(addressFamily string) {
 	if MGMTConfig.ExtraManifests {
 		clusterInstanceBuilder.WithExtraManifests(extraManifestNamespaceConfigmapName).
 			WithExtraManifests(extraManifestConfigmapConfigmapName)
+	}
+
+	if MGMTConfig.SeedClusterInfo.MirrorRegistryConfigured {
+		By("Create configmap for IDMS")
+
+		var ibioIDM *idms.Builder
+		for _, idm := range MGMTConfig.SeedClusterInfo.MirrorConfig.Spec.ImageDigestMirrors {
+			if ibioIDM == nil {
+				ibioIDM = idms.NewBuilder(APIClient, "image-digest-mirrors", idm)
+			} else {
+				ibioIDM.WithMirror(idm)
+			}
+		}
+
+		ibioIDMString, err := brutil.NewBackupRestoreObject(ibioIDM.Definition, APIClient.Scheme(),
+			configv1.SchemeGroupVersion).String()
+		Expect(err).NotTo(HaveOccurred(), "error creating string representation of image digest mirrors")
+		_, err = configmap.NewBuilder(
+			APIClient, idmsConfigmapName, MGMTConfig.Cluster.Info.ClusterName).WithData(map[string]string{
+			"image-digest-mirrors.yaml": ibioIDMString,
+		}).Create()
+		Expect(err).NotTo(HaveOccurred(), "error creating configmap for image digest mirrors")
+
+		clusterInstanceBuilder.WithExtraManifests(idmsConfigmapName)
 	}
 
 	if MGMTConfig.CABundle {
