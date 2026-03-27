@@ -448,7 +448,7 @@ func createNetworkConfig(config mgmtconfig.Cluster) networkconfig.NetworkConfig 
 
 	Expect(len(config.Info.Hosts)).To(Equal(1), "error: can only support SNO deployments")
 
-	for _, info := range MGMTConfig.Cluster.Info.Hosts {
+	for _, info := range config.Info.Hosts {
 		Expect(len(info.Network.Interfaces)).To(Equal(1), "error: can only support nodes with single network interface")
 
 		for baseIfaceName, iface := range info.Network.Interfaces {
@@ -456,36 +456,105 @@ func createNetworkConfig(config mgmtconfig.Cluster) networkconfig.NetworkConfig 
 
 			var dnsServers []string
 
-			vlanStr := strings.TrimSpace(info.Network.VLANID)
+			var networkConfigInterfaces []networkconfig.Interface
 
-			if vlanStr != "" {
-				vlanID, err := strconv.ParseUint(vlanStr, 10, 16)
+			interfaceConfig := networkconfig.Interface{
+				Name:       baseIfaceName,
+				Type:       "ethernet",
+				State:      "up",
+				Identifier: "mac-address",
+				MACAddress: iface.MACAddress,
+			}
+
+			if info.Network.VLANID == "" {
+				// Configure IPv4 without VLAN
+				if hasIPv4AddressFamily() {
+					nodeIPAddr, nodeIPNetwork, err := net.ParseCIDR(info.Network.Address.IPv4)
+					Expect(err).NotTo(HaveOccurred(), "error gathering IPv4 network info from provided address")
+
+					cidr, _ := nodeIPNetwork.Mask.Size()
+
+					interfaceConfig.IPv4 = networkconfig.IPConfig{
+						DHCP: false,
+						Address: []networkconfig.IPAddress{
+							{
+								IP:           nodeIPAddr.String(),
+								PrefixLength: strconv.Itoa(cidr),
+							},
+						},
+						Enabled: true,
+					}
+
+					routes = append(routes, networkconfig.RouteConfig{
+						Destination:      "0.0.0.0/0",
+						NextHopAddress:   info.Network.Gateway.IPv4,
+						NextHopInterface: baseIfaceName,
+					})
+
+					dnsServers = append(dnsServers, info.Network.DNS.IPv4)
+				} else {
+					interfaceConfig.IPv4 = networkconfig.IPConfig{
+						Enabled: false,
+					}
+				}
+
+				// Configure IPv6 without VLAN
+				if hasIPv6AddressFamily() {
+					nodeIPAddr, nodeIPNetwork, err := net.ParseCIDR(info.Network.Address.IPv6)
+					Expect(err).NotTo(HaveOccurred(), "error gathering IPv6 network info from provided address")
+
+					cidr, _ := nodeIPNetwork.Mask.Size()
+
+					autoconfFalse := false
+					interfaceConfig.IPv6 = networkconfig.IPConfig{
+						DHCP:     false,
+						Autoconf: &autoconfFalse,
+						Address: []networkconfig.IPAddress{
+							{
+								IP:           nodeIPAddr.String(),
+								PrefixLength: strconv.Itoa(cidr),
+							},
+						},
+						Enabled: true,
+					}
+
+					routes = append(routes, networkconfig.RouteConfig{
+						Destination:      "::/0",
+						NextHopAddress:   info.Network.Gateway.IPv6,
+						NextHopInterface: baseIfaceName,
+					})
+
+					dnsServers = append(dnsServers, info.Network.DNS.IPv6)
+				} else {
+					interfaceConfig.IPv6 = networkconfig.IPConfig{
+						Enabled: false,
+					}
+				}
+
+				networkConfigInterfaces = append(networkConfigInterfaces, interfaceConfig)
+			} else {
+				interfaceConfig.IPv4 = networkconfig.IPConfig{Enabled: false}
+				interfaceConfig.IPv6 = networkconfig.IPConfig{Enabled: false}
+
+				vlanID, err := strconv.ParseUint(info.Network.VLANID, 10, 16)
 				Expect(err).NotTo(HaveOccurred(), "network.vlan_id must be an unsigned integer")
 				Expect(vlanID).To(BeNumerically(">=", 1), "network.vlan_id must be between 1 and 4094")
 				Expect(vlanID).To(BeNumerically("<=", 4094), "network.vlan_id must be between 1 and 4094")
 
-				vlanIfaceName := fmt.Sprintf("%s.%s", baseIfaceName, vlanStr)
-
-				parentIface := networkconfig.Interface{
-					Name:       baseIfaceName,
-					Type:       "ethernet",
-					State:      "up",
-					Identifier: "mac-address",
-					MACAddress: iface.MACAddress,
-					IPv4:       networkconfig.IPConfig{Enabled: false},
-					IPv6:       networkconfig.IPConfig{Enabled: false},
-				}
+				vlanIfaceName := fmt.Sprintf("%s.%s", baseIfaceName, info.Network.VLANID)
 
 				vlanIface := networkconfig.Interface{
 					Name:       vlanIfaceName,
 					Type:       "vlan",
 					State:      "up",
 					MACAddress: iface.MACAddress,
-					VLANID:     vlanStr,
+					VLAN: networkconfig.VlanConfig{
+						ID:        int(vlanID),
+						BaseIface: baseIfaceName,
+					},
 				}
 
-				// Configure IPv4 on VLAN
-				//  interface
+				// Configure IPv4 with VLAN
 				if hasIPv4AddressFamily() {
 					nodeIPAddr, nodeIPNetwork, err := net.ParseCIDR(info.Network.Address.IPv4)
 					Expect(err).NotTo(HaveOccurred(), "error gathering IPv4 network info from provided address")
@@ -516,7 +585,7 @@ func createNetworkConfig(config mgmtconfig.Cluster) networkconfig.NetworkConfig 
 					}
 				}
 
-				// Configure IPv6 on VLAN interface
+				// Configure IPv6 with VLAN
 				if hasIPv6AddressFamily() {
 					nodeIPAddr, nodeIPNetwork, err := net.ParseCIDR(info.Network.Address.IPv6)
 					Expect(err).NotTo(HaveOccurred(), "error gathering IPv6 network info from provided address")
@@ -549,101 +618,11 @@ func createNetworkConfig(config mgmtconfig.Cluster) networkconfig.NetworkConfig 
 					}
 				}
 
-				nodeNetworkingConfig = networkconfig.NetworkConfig{
-					Interfaces: []networkconfig.Interface{
-						parentIface,
-						vlanIface,
-					},
-					Routes: networkconfig.Routes{
-						Config: routes,
-					},
-					DNSResolver: networkconfig.DNSResolver{
-						Config: networkconfig.DNSResolverConfig{
-							Server: dnsServers,
-						},
-					},
-				}
-
-				continue
-			}
-
-			// Initialize interface (no VLAN)
-			interfaceConfig := networkconfig.Interface{
-				Name:       baseIfaceName,
-				Type:       "ethernet",
-				State:      "up",
-				Identifier: "mac-address",
-				MACAddress: iface.MACAddress,
-			}
-
-			// Configure IPv4
-			if hasIPv4AddressFamily() {
-				nodeIPAddr, nodeIPNetwork, err := net.ParseCIDR(info.Network.Address.IPv4)
-				Expect(err).NotTo(HaveOccurred(), "error gathering IPv4 network info from provided address")
-
-				cidr, _ := nodeIPNetwork.Mask.Size()
-
-				interfaceConfig.IPv4 = networkconfig.IPConfig{
-					DHCP: false,
-					Address: []networkconfig.IPAddress{
-						{
-							IP:           nodeIPAddr.String(),
-							PrefixLength: strconv.Itoa(cidr),
-						},
-					},
-					Enabled: true,
-				}
-
-				routes = append(routes, networkconfig.RouteConfig{
-					Destination:      "0.0.0.0/0",
-					NextHopAddress:   info.Network.Gateway.IPv4,
-					NextHopInterface: baseIfaceName,
-				})
-
-				dnsServers = append(dnsServers, info.Network.DNS.IPv4)
-			} else {
-				interfaceConfig.IPv4 = networkconfig.IPConfig{
-					Enabled: false,
-				}
-			}
-
-			// Configure IPv6
-			if hasIPv6AddressFamily() {
-				nodeIPAddr, nodeIPNetwork, err := net.ParseCIDR(info.Network.Address.IPv6)
-				Expect(err).NotTo(HaveOccurred(), "error gathering IPv6 network info from provided address")
-
-				cidr, _ := nodeIPNetwork.Mask.Size()
-
-				autoconfFalse := false
-				interfaceConfig.IPv6 = networkconfig.IPConfig{
-					DHCP:     false,
-					Autoconf: &autoconfFalse,
-					Address: []networkconfig.IPAddress{
-						{
-							IP:           nodeIPAddr.String(),
-							PrefixLength: strconv.Itoa(cidr),
-						},
-					},
-					Enabled: true,
-				}
-
-				routes = append(routes, networkconfig.RouteConfig{
-					Destination:      "::/0",
-					NextHopAddress:   info.Network.Gateway.IPv6,
-					NextHopInterface: baseIfaceName,
-				})
-
-				dnsServers = append(dnsServers, info.Network.DNS.IPv6)
-			} else {
-				interfaceConfig.IPv6 = networkconfig.IPConfig{
-					Enabled: false,
-				}
+				networkConfigInterfaces = append(networkConfigInterfaces, interfaceConfig, vlanIface)
 			}
 
 			nodeNetworkingConfig = networkconfig.NetworkConfig{
-				Interfaces: []networkconfig.Interface{
-					interfaceConfig,
-				},
+				Interfaces: networkConfigInterfaces,
 				Routes: networkconfig.Routes{
 					Config: routes,
 				},
